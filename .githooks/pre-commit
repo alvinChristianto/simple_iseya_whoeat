@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Block commits on the main/master branch. All work must happen on a
+# feature branch; main only receives merges.
+
+branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "Error: do not commit directly on branch '$branch'." >&2
+  echo "Create a feature branch first, e.g.:" >&2
+  echo "  git switch -c <nama-fitur>" >&2
+  exit 1
+fi
+
+exit 0
