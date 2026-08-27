@@ -1,26 +1,34 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  jakartaDayRange,
-  todayJakartaKey,
+  jakartaRangeBoundary,
+  defaultRange,
   toJakartaKey,
   toJakartaTime,
 } from "@/lib/dates";
 import { buildWorkbook, excelContentType } from "@/lib/excel";
-import { dateKeySchema } from "@/lib/validation";
+import { dateRangeSchema } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
-  const raw = request.nextUrl.searchParams.get("tanggal");
-  const dateKey =
-    raw && dateKeySchema.safeParse(raw).success ? raw : todayJakartaKey();
+  const sp = request.nextUrl.searchParams;
+  const fallback = defaultRange();
 
-  const { start, end } = jakartaDayRange(dateKey);
+  const parsed = dateRangeSchema.safeParse({
+    dari: sp.get("dari") ?? fallback.dari,
+    sampai: sp.get("sampai") ?? fallback.sampai,
+  });
+
+  const { dari, sampai } = parsed.success ? parsed.data : fallback;
+
+  const { start, end } = jakartaRangeBoundary(dari, sampai);
+
   const records = await prisma.breadRecord.findMany({
     where: { recordedAt: { gte: start, lte: end } },
     include: { employee: true, breadType: true },
     orderBy: { recordedAt: "asc" },
   });
 
+  // Build aggregates for the Summary sheet
   const byBreadType = new Map<string, number>();
   const byEmployee = new Map<string, number>();
   const matrix = new Map<string, number>();
@@ -39,8 +47,10 @@ export async function GET(request: NextRequest) {
     category: r.category,
   }));
 
+  const dateLabel = dari === sampai ? dari : `${dari} – ${sampai}`;
+
   const totals = {
-    dateLabel: dateKey,
+    dateLabel,
     total: records.length,
     ho: records.filter((r) => r.category === "HO").length,
     luar: records.filter((r) => r.category === "LUAR").length,
@@ -54,10 +64,16 @@ export async function GET(request: NextRequest) {
 
   const buffer = await buildWorkbook(rows, totals);
 
+  // Filename: bread-records-DARI-sampai-SAMPAI.xlsx  (or just the date for single-day)
+  const filename =
+    dari === sampai
+      ? `bread-records-${dari}.xlsx`
+      : `bread-records-${dari}-sampai-${sampai}.xlsx`;
+
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": excelContentType(),
-      "Content-Disposition": `attachment; filename="bread-records-${dateKey}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 }

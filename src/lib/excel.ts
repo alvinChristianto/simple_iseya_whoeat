@@ -11,7 +11,11 @@ export interface RecordRow {
 }
 
 export interface SummaryTotals {
-  dateKey: string;
+  /** Human-readable label shown in the Summary sheet header.
+   *  Pass a single date key (e.g. "2026-08-27") for single-day exports,
+   *  or a range string (e.g. "2026-08-01 – 2026-08-07") for range exports.
+   */
+  dateLabel: string;
   total: number;
   ho: number;
   luar: number;
@@ -38,7 +42,7 @@ export async function buildWorkbook(
   records.addRows(rows);
 
   const summary = workbook.addWorksheet("Summary");
-  summary.addRow(["Date", totals.dateKey]);
+  summary.addRow(["Date", totals.dateLabel]);
   summary.addRow(["Total Records", totals.total]);
   summary.addRow(["HO", totals.ho]);
   summary.addRow(["LUAR", totals.luar]);
